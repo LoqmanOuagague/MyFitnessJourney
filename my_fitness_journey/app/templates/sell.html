@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vendre un article - IMT Market</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="d-flex flex-column min-vh-100 bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+        <div class="container">
+            <a class="navbar-brand text-primary fw-bold" href="/">🛍️ IMT Market</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/">Parcourir</a></li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="auth-links"></ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5 flex-grow-1">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card border-0 shadow-sm p-4">
+                    <h2 class="mb-4 text-primary fw-bold">📦 Mettre en vente</h2>
+                    
+                    <form id="sell-form" onsubmit="handleSell(event)">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Titre de l'annonce</label>
+                            <input type="text" id="title" class="form-control" placeholder="Ex: Baskets Nike Air, T42" required maxlength="140">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea id="description" class="form-control" rows="4" placeholder="État, couleur, motif de la vente..." required></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Prix (€)</label>
+                                <div class="input-group">
+                                    <input type="number" id="price" class="form-control" required min="0" step="0.01">
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Frais de port (€)</label>
+                                <div class="input-group">
+                                    <input type="number" id="shipping" class="form-control" required min="0" step="0.01">
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Catégorie</label>
+                            <select id="category" class="form-select" required>
+                                <option value="">Chargement des catégories...</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Photos (Max 12)</label>
+                            <input type="file" id="photo-file" class="form-control" accept="image/jpeg, image/png, image/webp" multiple>
+                            <div class="form-text text-muted">Sélectionnez vos images. L'upload commencera automatiquement.</div>
+                            
+                            <div id="photo-status" class="mt-2 text-success small fw-bold"></div>
+                            <div id="photo-error" class="mt-2 text-danger small fw-bold d-none"></div>
+                        </div>
+
+                        <div class="alert alert-danger d-none" id="form-error"></div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">Publier l'annonce</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-white py-4 mt-auto border-top">
+        <div class="container text-center text-muted"><small>&copy; 2025 IMT Marketplace</small></div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/app.js"></script>
+
+    <script>
+        // -----------------------------------------------------
+        // VARIABLE GLOBALE : Stocke les IDs des photos uploadées
+        // -----------------------------------------------------
+        let uploadedPhotoRefs = [];
+        
+        // 1. SÉCURITÉ : Rediriger si non connecté
+        if (!localStorage.getItem("user_email")) {
+            alert("Veuillez vous connecter pour vendre un article.");
+            window.location.href = "/login.html";
+        }
+
+        // 2. CHARGEMENT DES CATÉGORIES (Au démarrage)
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const cats = await callApi("/api/categories");
+                const select = document.getElementById("category");
+                select.innerHTML = '<option value="">Choisir une catégorie...</option>';
+                cats.forEach(c => {
+                    const o = document.createElement("option"); 
+                    o.value = c.id; 
+                    o.innerText = c.name; 
+                    select.appendChild(o);
+                });
+            } catch (e) { 
+                console.error("Erreur chargement catégories:", e); 
+                document.getElementById("category").innerHTML = '<option value="">Erreur de chargement</option>';
+            }
+
+            // Ajout de l'écouteur pour l'upload
+            const photoInput = document.getElementById("photo-file");
+            if(photoInput) {
+                photoInput.addEventListener("change", handlePhotoSelection);
+            }
+        });
+
+        // -----------------------------------------------------
+        // 3. GESTION DE L'UPLOAD ASYNCHRONE DES PHOTOS
+        // -----------------------------------------------------
+        async function handlePhotoSelection(e) {
+            const files = e.target.files;
+            const statusDiv = document.getElementById("photo-status");
+            const errorDiv = document.getElementById("photo-error");
+            const btn = document.getElementById("submit-btn");
+
+            if (!files || files.length === 0) return;
+
+            // Réinitialisation de l'état
+            uploadedPhotoRefs = []; 
+            statusDiv.innerText = "Upload en cours...";
+            errorDiv.classList.add("d-none");
+            btn.disabled = true; // Empêche de publier pendant l'upload
+            
+            try {
+                let count = 0;
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    
+                    // Appel API (uploadPhoto est dans api.js)
+                    // Cela crée la ligne en BDD et sauvegarde le fichier
+                    const result = await uploadPhoto(file); 
+                    
+                    // L'URL retournée est type : /api/photos/123
+                    // On extrait l'ID numérique à la fin de l'URL
+                    const parts = result.url.split('/');
+                    const photoId = parseInt(parts[parts.length - 1]); 
+                    
+                    if (isNaN(photoId)) throw new Error("ID photo invalide reçu du serveur.");
+
+                    // On ajoute la référence pour la liaison future
+                    uploadedPhotoRefs.push({ 
+                        id: photoId, 
+                        // La première photo sélectionnée sera la miniature
+                        is_thumbnail: i === 0 
+                    });
+                    count++;
+                }
+                
+                statusDiv.innerText = `✅ ${count} photo(s) prête(s) à être liée(s).`;
+                btn.disabled = false; // Réactive le bouton
+
+            } catch (err) {
+                console.error(err);
+                statusDiv.innerText = "";
+                errorDiv.innerText = "Erreur d'upload : " + err.message;
+                errorDiv.classList.remove("d-none");
+                e.target.value = null; // Réinitialise l'input pour réessayer
+                uploadedPhotoRefs = [];
+                btn.disabled = false;
+            }
+        }
+
+        // -----------------------------------------------------
+        // 4. GESTION DE LA SOUMISSION FINALE (LIAISON)
+        // -----------------------------------------------------
+        async function handleSell(e) {
+            e.preventDefault();
+            const btn = document.getElementById("submit-btn");
+            const errorBox = document.getElementById("form-error");
+            
+            btn.disabled = true;
+            btn.innerText = "Publication en cours...";
+            errorBox.classList.add("d-none");
+
+            try {
+                // Validation Front-End
+                if (uploadedPhotoRefs.length === 0) throw new Error("Veuillez uploader au moins une photo.");
+
+                const price = parseFloat(document.getElementById("price").value);
+                const ship = parseFloat(document.getElementById("shipping").value);
+                const catId = document.getElementById("category").value;
+
+                if (!catId) throw new Error("Veuillez sélectionner une catégorie.");
+                if (price < 0 || ship < 0) throw new Error("Les prix doivent être positifs.");
+
+                // APPEL API FINAL : Création du Listing + Liaison des IDs photos
+                await callApi("/api/listings", "POST", {
+                    title: document.getElementById("title").value,
+                    description: document.getElementById("description").value,
+                    price_cents: Math.round(price * 100),    // Conversion en centimes
+                    shipping_cents: Math.round(ship * 100),  // Conversion en centimes
+                    category_id: parseInt(catId),
+                    photos: uploadedPhotoRefs // Envoi du tableau d'IDs
+                });
+
+                alert(" Annonce publiée avec succès !");
+                window.location.href = "/"; // Redirection vers l'accueil
+
+            } catch (err) {
+                console.error(err);
+                errorBox.innerText = err.message;
+                errorBox.classList.remove("d-none");
+                btn.disabled = false;
+                btn.innerText = "Publier l'annonce";
+            }
+        }
+    </script>
+</body>
+</html>

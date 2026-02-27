@@ -1,0 +1,51 @@
+/* Backend/app/static/css/style.css */
+
+/* Police plus moderne */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa; /* Gris très clair pour le fond */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Footer collé en bas */
+footer {
+    margin-top: auto;
+    background-color: #fff;
+    padding: 20px 0;
+    border-top: 1px solid #eaeaea;
+}
+
+/* Effet sur les cartes produits */
+.listing-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.listing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+    cursor: pointer;
+}
+
+/* Navbar */
+.navbar-brand {
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #0d6efd !important; /* Bleu Bootstrap */
+}
+
+/* Prix et Badges */
+.price-tag {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #0d6efd;
+}
+
+.shipping-tag {
+    font-size: 0.8rem;
+    color: #6c757d;
+}

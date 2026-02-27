@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion / Inscription - IMT Market</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="d-flex flex-column min-vh-100 bg-light">
+
+    <nav class="navbar navbar-light bg-white shadow-sm mb-5">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-primary" href="/">🛍️ IMT Market</a>
+        </div>
+    </nav>
+
+    <div class="container py-5 flex-grow-1">
+        <div class="row justify-content-center">
+            <div class="col-md-5">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        
+                        <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-login">Se connecter</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-register">Créer un compte</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="pills-login">
+                                <p class="text-muted small mb-3">Entrez votre email pour vous identifier.</p>
+                                <form onsubmit="handleLogin(event)">
+                                    <div class="mb-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" id="login-email" class="form-control" required placeholder="ex: bob@imt.test">
+                                    </div>
+                                    <div class="alert alert-danger d-none" id="login-error"></div>
+                                    <button type="submit" class="btn btn-primary w-100">Accéder</button>
+                                </form>
+                            </div>
+
+                            <div class="tab-pane fade" id="pills-register">
+                                <form onsubmit="handleRegister(event)">
+                                    <div class="mb-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" id="reg-email" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Mot de passe</label>
+                                        <input type="password" id="reg-password" class="form-control" required minlength="4">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Nom (Optionnel)</label>
+                                        <input type="text" id="reg-name" class="form-control">
+                                    </div>
+                                    
+                                    <div class="alert alert-danger d-none" id="reg-error"></div>
+                                    <button type="submit" class="btn btn-success w-100">S'inscrire</button>
+                                </form>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="/" class="text-muted text-decoration-none">← Retour à l'accueil</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-white py-4 mt-auto border-top">
+        <div class="container text-center text-muted"><small>&copy; 2025 IMT Marketplace</small></div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/api.js"></script>
+    
+    <script>
+        // --- LOGIQUE DE CONNEXION SÉCURISÉE ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById("login-email");
+            const email = emailInput.value.trim();
+            const btn = e.target.querySelector("button");
+            const errorBox = document.getElementById("login-error");
+
+            if(!email) return;
+
+            // Reset UI
+            btn.disabled = true;
+            btn.innerText = "Vérification...";
+            errorBox.classList.add("d-none");
+
+            try {
+                // ASTUCE : On essaie d'accéder à une ressource protégée (ex: mes adresses)
+                // Si l'utilisateur n'existe pas, le backend renverra 401 ou 404 (User not found).
+                const response = await fetch('/api/addresses', {
+                    method: 'GET',
+                    headers: { 'X-User-Email': email }
+                });
+
+                if (response.ok) {
+                    // ✅ SUCCÈS : L'utilisateur existe et est reconnu
+                    localStorage.setItem("user_email", email);
+                    window.location.href = "/"; 
+                } else {
+                    // ❌ ÉCHEC : Utilisateur inconnu ou erreur serveur
+                    if (response.status === 401 || response.status === 404) {
+                        throw new Error("Compte introuvable. Vérifiez l'email ou créez un compte.");
+                    } else {
+                        throw new Error("Erreur de connexion (" + response.status + ")");
+                    }
+                }
+
+            } catch (err) {
+                errorBox.textContent = err.message;
+                errorBox.classList.remove("d-none");
+                btn.disabled = false;
+                btn.innerText = "Accéder";
+                emailInput.focus();
+            }
+        }
+
+        // --- LOGIQUE D'INSCRIPTION (Inchangée mais toujours nécessaire) ---
+        async function handleRegister(e) {
+            e.preventDefault();
+            const email = document.getElementById("reg-email").value;
+            const password = document.getElementById("reg-password").value;
+            const name = document.getElementById("reg-name").value || "Utilisateur";
+            const errorBox = document.getElementById("reg-error");
+            const btn = e.target.querySelector("button");
+
+            btn.disabled = true;
+
+            try {
+                // Appel POST /api/users
+                await callApi("/api/users", "POST", { 
+                    email: email, 
+                    password: password,
+                    name: name,
+                    credits_cents: 0
+                });
+                
+                // Auto-login après succès
+                localStorage.setItem("user_email", email);
+                alert("Compte créé avec succès !");
+                window.location.href = "/";
+
+            } catch (err) {
+                errorBox.textContent = err.message;
+                errorBox.classList.remove("d-none");
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

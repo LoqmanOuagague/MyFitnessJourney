@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Profil - IMT Market</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="d-flex flex-column min-vh-100 bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+        <div class="container">
+            <a class="navbar-brand text-primary fw-bold" href="/">🛍️ IMT Market</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/">Parcourir</a></li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="auth-links"></ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5 flex-grow-1">
+        <h2 class="mb-4 fw-bold text-secondary">Mon Tableau de Bord</h2>
+
+        <div class="row">
+            <div class="col-md-3 mb-4">
+                <div class="list-group shadow-sm">
+                    <a href="#wallet" class="list-group-item list-group-item-action active" data-bs-toggle="list">💰 Portefeuille</a>
+                    <a href="#orders" class="list-group-item list-group-item-action" data-bs-toggle="list" onclick="loadOrders()">📦 Mes Commandes</a>
+                    <a href="#sales" class="list-group-item list-group-item-action" data-bs-toggle="list" onclick="loadSales()">🏷️ Mes Ventes</a>
+                    <a href="#addresses" class="list-group-item list-group-item-action" data-bs-toggle="list" onclick="loadAddresses()">📍 Mes Adresses</a>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <div class="tab-content">
+                    
+                    <div class="tab-pane fade show active" id="wallet">
+                        <div class="card border-0 shadow-sm p-4">
+                            <h4 class="mb-4">Mon Solde</h4>
+                            <div class="alert alert-info d-flex justify-content-between align-items-center">
+                                <span>Solde actuel :</span>
+                                <span class="fs-3 fw-bold" id="current-balance">--- €</span>
+                            </div>
+
+                            <hr>
+                            <h5>Recharger mon compte</h5>
+                            <form onsubmit="handleTopUp(event)" class="row g-3 align-items-end">
+                                <div class="col-auto">
+                                    <label class="form-label">Montant (€)</label>
+                                    <input type="number" id="topup-amount" class="form-control" placeholder="Ex: 50" min="1" required>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="submit" class="btn btn-success">➕ Recharger</button>
+                                </div>
+                            </form>
+
+                            <hr class="mt-5">
+                            <h5 class="text-muted">Historique des transactions</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped mt-3">
+                                    <thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Solde après</th></tr></thead>
+                                    <tbody id="ledger-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="orders">
+                        <div class="card border-0 shadow-sm p-4">
+                            <h4>Mes Achats</h4>
+                            <div id="orders-list" class="mt-3">Chargement...</div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="sales">
+                        <div class="card border-0 shadow-sm p-4">
+                            <h4>Mes Ventes</h4>
+                            <div id="sales-list" class="mt-3">Chargement...</div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="addresses">
+                        <div class="card border-0 shadow-sm p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4>Mes Adresses</h4>
+                                <button class="btn btn-outline-primary btn-sm" onclick="showAddAddressModal()">+ Ajouter</button>
+                            </div>
+                            <div id="address-list" class="list-group">Chargement...</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addressModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form class="modal-content" onsubmit="handleAddAddress(event)">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nouvelle Adresse</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="addr-line1" class="form-control mb-2" placeholder="Rue / Voie" required>
+                    <input type="text" id="addr-city" class="form-control mb-2" placeholder="Ville" required>
+                    <input type="text" id="addr-zip" class="form-control mb-2" placeholder="Code Postal" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/app.js"></script>
+
+    <script>
+        // 1. SÉCURITÉ
+        if (!localStorage.getItem("user_email")) window.location.href = "/login.html";
+
+        // 2. CHARGEMENT INITIAL (PORTEFEUILLE)
+        document.addEventListener("DOMContentLoaded", loadWallet);
+
+        // --- GESTION PORTEFEUILLE (Credits) ---
+        async function loadWallet() {
+            try {
+                const data = await callApi("/api/credits/ledger");
+                document.getElementById("current-balance").innerText = formatMoney(data.balance_cents);
+                
+                const tbody = document.getElementById("ledger-table");
+                tbody.innerHTML = "";
+                data.txns.forEach(t => {
+                    const date = new Date(t.created_at).toLocaleDateString();
+                    // Couleur : Rouge si négatif, Vert si positif
+                    const color = t.amount_cents < 0 ? "text-danger" : "text-success";
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${date}</td>
+                            <td><span class="badge bg-light text-dark border">${t.type}</span></td>
+                            <td class="${color} fw-bold">${formatMoney(t.amount_cents)}</td>
+                            <td>${formatMoney(t.balance_after_cents)}</td>
+                        </tr>`;
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function handleTopUp(e) {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById("topup-amount").value);
+            try {
+                await callApi("/api/credits/topup", "POST", { amount_cents: Math.round(amount * 100) });
+                alert("Rechargement réussi !");
+                document.getElementById("topup-amount").value = "";
+                loadWallet();
+            } catch (e) { alert(e.message); }
+        }
+
+        // --- GESTION DES COMMANDES (Purchases - Buyer) ---
+        async function loadOrders() {
+            const container = document.getElementById("orders-list");
+            container.innerHTML = '<div class="spinner-border text-primary"></div>';
+            try {
+                const orders = await callApi("/api/purchases?role=buyer");
+                container.innerHTML = "";
+                if(orders.length === 0) {
+                    container.innerHTML = "<p>Aucune commande effectuée.</p>";
+                    return;
+                }
+                
+                orders.forEach(o => {
+                    // Logique pour le bouton de déclaration
+                    let actionBtn = "";
+                    if (o.status === "paid" || o.status === "delivered") {
+                        actionBtn = `
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-success me-2" onclick="declareOutcome(${o.id}, 'OK')">✅ Bien reçu</button>
+                                <button class="btn btn-sm btn-danger" onclick="declareOutcome(${o.id}, 'NOT_RECEIVED')">⚠️ Problème</button>
+                            </div>
+                        `;
+                    } else if (o.status === "closed") {
+                        actionBtn = `<span class="badge bg-success">Clôturé (OK)</span>`;
+                    } else if (o.status === "refunded") {
+                        actionBtn = `<span class="badge bg-warning text-dark">Remboursé</span>`;
+                    }
+
+                    container.innerHTML += `
+                        <div class="card mb-3 p-3">
+                            <div class="d-flex justify-content-between">
+                                <strong>Commande #${o.id}</strong>
+                                <span class="fw-bold">${formatMoney(o.total_cents)}</span>
+                            </div>
+                            <small class="text-muted">Vendeur: ${o.seller_email}</small>
+                            ${actionBtn}
+                        </div>
+                    `;
+                });
+            } catch (e) { container.innerText = "Erreur chargement."; }
+        }
+
+        // --- DÉCLARATION D'ISSUE (Remboursement ou Clôture) ---
+        async function declareOutcome(purchaseId, status) {
+            if (!confirm(status === 'OK' ? "Confirmer la réception conforme ?" : "Déclarer un problème (Demande de remboursement) ?")) return;
+            
+            try {
+                // Si Problème, on envoie 'NOT_RECEIVED' (ou 'NOT_AS_DESCRIBED')
+                const apiStatus = status === 'OK' ? 'OK' : 'NOT_RECEIVED';
+                
+                await callApi(`/api/purchases/${purchaseId}/declare`, "POST", { status: apiStatus });
+                alert(status === 'OK' ? "Merci ! Transaction terminée." : "Réclamation enregistrée. Vous avez été remboursé.");
+                loadOrders(); // Rafraîchir la liste
+                loadWallet(); // Rafraîchir le solde
+            } catch (e) { alert(e.message); }
+        }
+
+        // --- GESTION DES VENTES (Purchases - Seller) ---
+        async function loadSales() {
+            const container = document.getElementById("sales-list");
+            container.innerHTML = "Chargement...";
+            try {
+                const sales = await callApi("/api/purchases?role=seller");
+                container.innerHTML = "";
+                if(sales.length === 0) container.innerHTML = "<p>Aucune vente.</p>";
+                
+                sales.forEach(s => {
+                    container.innerHTML += `
+                        <div class="card mb-2 p-2">
+                            <div class="d-flex justify-content-between">
+                                <span>Vente #${s.id}</span>
+                                <span class="text-success fw-bold">+${formatMoney(s.item_price_cents + s.shipping_cents)}</span>
+                            </div>
+                            <small>Acheteur: ${s.buyer_email} | Statut: ${s.status}</small>
+                        </div>`;
+                });
+            } catch (e) { container.innerText = "Erreur."; }
+        }
+
+        // --- GESTION DES ADRESSES ---
+        async function loadAddresses() {
+            const list = document.getElementById("address-list");
+            try {
+                const addrs = await callApi("/api/addresses");
+                list.innerHTML = "";
+                if(addrs.length === 0) list.innerHTML = "<p>Aucune adresse enregistrée.</p>";
+                
+                addrs.forEach(a => {
+                    list.innerHTML += `
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${a.line1}</strong><br>
+                                <small>${a.postal_code} ${a.city}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAddress(${a.id})">×</button>
+                        </div>`;
+                });
+            } catch(e) {}
+        }
+
+        function showAddAddressModal() {
+            new bootstrap.Modal(document.getElementById('addressModal')).show();
+        }
+
+        async function handleAddAddress(e) {
+            e.preventDefault();
+            try {
+                await callApi("/api/addresses", "POST", {
+                    line1: document.getElementById("addr-line1").value,
+                    city: document.getElementById("addr-city").value,
+                    postal_code: document.getElementById("addr-zip").value
+                });
+                bootstrap.Modal.getInstance(document.getElementById('addressModal')).hide();
+                loadAddresses();
+            } catch(e) { alert(e.message); }
+        }
+
+        async function deleteAddress(id) {
+            if(!confirm("Supprimer ?")) return;
+            try {
+                await callApi(`/api/addresses/${id}`, "DELETE");
+                loadAddresses();
+            } catch(e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>

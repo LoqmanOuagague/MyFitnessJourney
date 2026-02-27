@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMT Marketplace</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- CHARGEMENT DU STYLE VIA FLASK (JINJA2) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Barre de Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">🛍️ IMT Market</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link active" href="/">Parcourir</a></li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="auth-links">
+                    <!-- Rempli dynamiquement par app.js -->
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Bannière de recherche -->
+    <header class="bg-primary text-white py-5 text-center mb-4">
+        <div class="container">
+            <h1 class="fw-bold">Bonjour!</h1>
+            <p class="lead">Mode seconde main, première qualité.</p>
+            <div class="row justify-content-center mt-3">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" id="search-input" class="form-control" placeholder="Que cherchez-vous ? (ex: Pull, Nike...)">
+                        <button class="btn btn-light text-primary fw-bold" onclick="loadListings()">Rechercher</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenu Principal -->
+    <div class="container mb-5">
+        <div class="row">
+            
+            <!-- Filtres Latéraux (Colonne Gauche) -->
+            <div class="col-md-3">
+                <div class="card p-3 border-0 shadow-sm mb-4">
+                    <h5 class="fw-bold mb-3">Filtres</h5>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Catégorie</label>
+                        <select class="form-select" id="category-filter">
+                            <option value="">Toutes</option>
+                            <!-- Rempli par JS -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Prix Max (€)</label>
+                        <input type="number" class="form-control" id="price-max" placeholder="ex: 50">
+                    </div>
+                    <button class="btn btn-primary w-100" onclick="loadListings()">Filtrer</button>
+                </div>
+            </div>
+
+            <!-- Grille des Produits (Colonne Droite) -->
+            <div class="col-md-9">
+                <div id="listings-container" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    <!-- Loader initial -->
+                    <div class="text-center w-100 py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Chargement des articles...</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center text-muted py-4 mt-auto">
+        <div class="container">
+            <small>&copy; 2025 IMT Marketplace - Projet Web Dev</small>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- CHARGEMENT DES JS VIA FLASK (JINJA2) -->
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+    <script>
+        // Logique spécifique à l'accueil
+        document.addEventListener("DOMContentLoaded", () => {
+            loadCategories();
+            loadListings();
+        });
+
+        // 1. Charger les catégories pour le menu déroulant
+        async function loadCategories() {
+            try {
+                const cats = await callApi("/api/categories");
+                const select = document.getElementById("category-filter");
+                cats.forEach(c => {
+                    const opt = document.createElement("option");
+                    opt.value = c.id;
+                    opt.innerText = c.name;
+                    select.appendChild(opt);
+                });
+            } catch (e) { 
+                console.error("Erreur chargement catégories", e); 
+            }
+        }
+
+        // 2. Charger les annonces (Browse)
+        async function loadListings() {
+            const container = document.getElementById("listings-container");
+            const search = document.getElementById("search-input").value;
+            const catId = document.getElementById("category-filter").value;
+            const priceMax = document.getElementById("price-max").value;
+
+            // Construction de l'URL avec les filtres
+            // On utilise /browse/listings qui calcule les totaux côté serveur
+            let url = "/api/browse/listings?page_size=50";
+            
+            if (search) url += `&q=${encodeURIComponent(search)}`;
+            if (catId) url += `&category_id=${catId}`;
+            if (priceMax) url += `&max_price_cents=${priceMax * 100}`; // Conversion € -> Cents
+
+            try {
+                const data = await callApi(url);
+                container.innerHTML = ""; // Efface le loader
+
+                if (data.items.length === 0) {
+                    container.innerHTML = `<div class="alert alert-light text-center w-100">Aucun résultat trouvé pour cette recherche.</div>`;
+                    return;
+                }
+
+                // Génération des cartes HTML pour chaque produit
+                data.items.forEach(item => {
+                    // Gestion image par défaut si pas de photo
+                    const img = (item.photos && item.photos.length > 0) 
+                        ? item.photos.find(p => p.is_thumbnail)?.url || item.photos[0].url
+                        : "https://via.placeholder.com/300x200?text=No+Image";
+
+                    const html = `
+                        <div class="col">
+                            <div class="card h-100 listing-card" onclick="window.location.href='item.html?id=${item.id}'">
+                                <img src="${img}" class="card-img-top" alt="${item.title}" style="height: 200px; object-fit: cover;">
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title text-truncate">${item.title}</h5>
+                                    <p class="card-text small text-muted text-truncate">${item.description}</p>
+                                    
+                                    <div class="mt-auto pt-3 d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="price-tag">${formatMoney(item.price_cents)}</div>
+                                            <div class="shipping-tag">+${formatMoney(item.shipping_cents)} port</div>
+                                        </div>
+                                        <span class="badge bg-light text-dark border">Voir ></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += html;
+                });
+
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = `<div class="alert alert-danger w-100">Impossible de charger les annonces.<br>Vérifiez que le serveur Python tourne bien sur le port 5000.</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
