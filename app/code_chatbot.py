@@ -6,6 +6,9 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
+from langchain_community.document_loaders import CSVLoader
+
+load_dotenv()
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -38,12 +41,9 @@ model = ChatOpenAI(
 # ==========================================
 
 # Dataset 1 : Mega Fitness Dataset (Kaggle) - Simulation
-fitness_docs = [
-    Document(page_content="Bench Press (Développé couché) : Exercice polyarticulaire ciblant les pectoraux, les triceps et les épaules. Équipement : Banc, Barre.", metadata={"muscle": "Chest", "type": "Strength"}),
-    Document(page_content="Barbell Curl (Curl à la barre) : Exercice d'isolation ciblant les biceps. Équipement : Barre. 3 séries de 10-12 répétitions recommandées pour l'hypertrophie.", metadata={"muscle": "Biceps", "type": "Strength"}),
-    Document(page_content="HIIT Treadmill (Tapis de course) : 30 secondes de sprint, 30 secondes de marche. Excellent pour la perte de graisse et l'endurance cardiovasculaire.", metadata={"muscle": "Full Body", "type": "Cardio"})
-]
-
+fitness_loader = CSVLoader(file_path="database/megaGymDataset.csv")
+fitness_docs = fitness_loader.load()
+print(fitness_docs[0].page_content)
 # Dataset 2 : Food.com Recipes Dataset (Kaggle) - Simulation
 nutrition_docs = [
     Document(page_content="Recette : High Protein Chicken & Rice Bowl. Ingrédients : 200g de blanc de poulet, 100g de riz basmati, 50g de brocolis. Nutrition : 550 kcal, 45g de protéines, 55g de glucides, 10g de lipides.", metadata={"category": "High Protein", "calories": 550}),
