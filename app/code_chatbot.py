@@ -4,14 +4,14 @@ from langchain.agents import create_agent
 from langchain_openai import AzureOpenAIEmbeddings, ChatOpenAI
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
+from langchain_community.vectorstores import Chroma
+
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
-from langchain_community.document_loaders import CSVLoader
 
 load_dotenv()
 
-# Chargement des variables d'environnement
-load_dotenv()
+CHROMA_DIR = os.getenv("CHROMA_PATH")
 
 def get_embeddings_endpoint():
     """Get the Azure OpenAI endpoint, removing /openai/v1 suffix if present."""
@@ -40,10 +40,7 @@ model = ChatOpenAI(
 # 2. CRÉATION DES BASES DE DONNÉES (RAG)
 # ==========================================
 
-# Dataset 1 : Mega Fitness Dataset (Kaggle) - Simulation
-fitness_loader = CSVLoader(file_path="database/megaGymDataset.csv")
-fitness_docs = fitness_loader.load()
-print(fitness_docs[0].page_content)
+
 # Dataset 2 : Food.com Recipes Dataset (Kaggle) - Simulation
 nutrition_docs = [
     Document(page_content="Recette : High Protein Chicken & Rice Bowl. Ingrédients : 200g de blanc de poulet, 100g de riz basmati, 50g de brocolis. Nutrition : 550 kcal, 45g de protéines, 55g de glucides, 10g de lipides.", metadata={"category": "High Protein", "calories": 550}),
@@ -52,7 +49,7 @@ nutrition_docs = [
 ]
 
 # Création des deux Vector Stores distincts
-fitness_vector_store = InMemoryVectorStore.from_documents(fitness_docs, embeddings)
+fitness_vector_store = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DIR)
 nutrition_vector_store = InMemoryVectorStore.from_documents(nutrition_docs, embeddings)
 
 # ==========================================
@@ -64,7 +61,7 @@ def search_fitness_database(query: str) -> str:
     """Search the Mega Fitness Database to find specific exercises, target muscles, and workout equipment.
     Use this to build the gym plan.
     """
-    results = fitness_vector_store.similarity_search(query, k=2)
+    results = fitness_vector_store.similarity_search(query, k=50)
     return "\n\n".join([f"[{doc.metadata['muscle']}]: {doc.page_content}" for doc in results])
 
 @tool
@@ -72,7 +69,7 @@ def search_nutrition_database(query: str) -> str:
     """Search the Food.com Recipes Database to find meals, exact ingredients, and nutritional values (macros/calories).
     Use this to build the meal plan.
     """
-    results = nutrition_vector_store.similarity_search(query, k=2)
+    results = nutrition_vector_store.similarity_search(query, k=50)
     return "\n\n".join([f"[{doc.metadata['category']}]: {doc.page_content}" for doc in results])
 
 # ==========================================
